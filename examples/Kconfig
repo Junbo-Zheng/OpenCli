@@ -1,0 +1,45 @@
+#
+# Copyright 2026 Junbo Zheng
+# SPDX-License-Identifier: Apache-2.0
+#
+# Kconfig for example application.
+#
+
+config CLI_BUILD_EXAMPLES
+    bool "Build example application"
+    default y
+    help
+      Build the demo CLI application in examples/.
+      Use "Example Commands" menu to select which commands to include.
+
+if CLI_BUILD_EXAMPLES
+
+menu "Example Commands"
+
+config CLI_CMD_LS
+    bool "Enable 'ls' command"
+    default y
+
+config CLI_CMD_UPTIME
+    bool "Enable 'uptime' command"
+    default y
+
+config CLI_CMD_DATE
+    bool "Enable 'date' command"
+    default y
+
+config CLI_CMD_UNAME
+    bool "Enable 'uname' command"
+    default y
+
+config CLI_CMD_PS
+    bool "Enable 'ps' command"
+    default y
+
+config CLI_CMD_FREE
+    bool "Enable 'free' command"
+    default y
+
+endmenu
+
+endif

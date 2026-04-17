@@ -1,0 +1,110 @@
+#
+# Copyright 2026 Junbo Zheng
+# SPDX-License-Identifier: Apache-2.0
+#
+# Kconfig for CLI core library.
+#
+
+menu "CLI Core"
+
+config CLI_VERSION
+    string "Version string"
+    default "2026.04.17"
+
+config CLI_PROMPT
+    string "Default prompt string"
+    default "cli> "
+
+config CLI_MAX_LINE
+    int "Maximum input line length"
+    default 256
+    range 64 1024
+
+config CLI_MAX_HISTORY
+    int "History buffer depth"
+    default 16
+    range 4 128
+
+config CLI_MAX_PROMPT
+    int "Maximum prompt string length"
+    default 32
+    range 8 128
+
+config CLI_MAX_COMMANDS
+    int "Maximum registered commands"
+    default 32
+    range 8 128
+
+config CLI_MAX_SUB_COMMANDS
+    int "Maximum sub-commands per command"
+    default 16
+    range 4 64
+
+choice CLI_CTRL_C_ACTION
+    prompt "Ctrl-C behavior"
+    default CLI_CTRL_C_QUIT
+
+config CLI_CTRL_C_QUIT
+    bool "Quit CLI"
+
+config CLI_CTRL_C_CLEAR_LINE
+    bool "Clear current line"
+
+config CLI_CTRL_C_IGNORE
+    bool "Ignore"
+
+endchoice
+
+endmenu
+
+menu "Built-in Commands"
+
+config CLI_CMD_HELP
+    bool "Enable 'help' command"
+    default y
+
+config CLI_CMD_VERSION
+    bool "Enable 'version' command"
+    default y
+
+config CLI_CMD_ECHO
+    bool "Enable 'echo' command"
+    default y
+
+config CLI_CMD_CLEAR
+    bool "Enable 'clear' command"
+    default y
+
+endmenu
+
+menu "Platform"
+
+choice CLI_PLATFORM
+    prompt "Port layer"
+    default CLI_PLATFORM_LINUX
+
+config CLI_PLATFORM_LINUX
+    bool "Linux/macOS (termios)"
+
+config CLI_PLATFORM_RTOS
+    bool "RTOS (user-provided UART)"
+
+endchoice
+
+endmenu
+
+menu "Debug"
+
+config CLI_ASAN
+    bool "Enable AddressSanitizer (ASan)"
+    default y if CLI_PLATFORM_LINUX
+    help
+      Detect memory errors: buffer overflow, use-after-free, etc.
+
+config CLI_UBSAN
+    bool "Enable UndefinedBehaviorSanitizer (UBSan)"
+    default y if CLI_PLATFORM_LINUX
+    help
+      Detect undefined behavior: signed overflow, null deref, etc.
+
+endmenu

@@ -1,0 +1,5 @@
+#
+# Default configuration for mini-cli.
+# Use 'cmake --build build -t savedefconfig' to regenerate.
+#
+# CONFIG_CLI_CMD_FREE is not set

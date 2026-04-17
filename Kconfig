@@ -1,0 +1,12 @@
+#
+# Copyright 2026 Junbo Zheng
+# SPDX-License-Identifier: Apache-2.0
+#
+# Kconfig — build-time configuration for cpp-cli.
+# Use 'cmake --build build -t menuconfig' to modify.
+#
+
+mainmenu "mini-cli Configuration"
+
+source "src/Kconfig"
+source "examples/Kconfig"

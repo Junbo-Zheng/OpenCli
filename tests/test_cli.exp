@@ -1,0 +1,105 @@
+#!/usr/bin/expect -f
+# Copyright 2026 Junbo Zheng
+# SPDX-License-Identifier: Apache-2.0
+#
+# Automated test for mini-cli: tab completion, history, and basic commands.
+# Usage: expect tests/test_cli.exp [path_to_cli_binary]
+# Requires: expect (apt install expect)
+
+set timeout 5
+
+# Allow passing binary path as argument, default to build/cli
+if {$argc > 0} {
+    set cli_bin [lindex $argv 0]
+} else {
+    set cli_bin "build/cli"
+}
+
+spawn $cli_bin
+expect "cli> "
+
+# ---- Test 1: Basic commands ----
+send "help\r"
+expect "Available commands:"
+puts "\n\[PASS\] help command"
+
+expect "cli> "
+send "version\r"
+expect "v2026.04.17"
+puts "\[PASS\] version command"
+
+expect "cli> "
+send "echo hello world\r"
+expect "hello world"
+puts "\[PASS\] echo command"
+
+expect "cli> "
+send "foobar\r"
+expect "Unknown command"
+puts "\[PASS\] unknown command handling"
+
+# ---- Test 2: Tab completion (single match) ----
+expect "cli> "
+send "he\t"
+expect "help "
+send "\r"
+expect "Available commands:"
+puts "\[PASS\] tab single match (he -> help)"
+
+# ---- Test 3: Tab completion (multiple matches) ----
+expect "cli> "
+send "h\t"
+expect "help"
+expect "history"
+puts "\[PASS\] tab multiple matches (h -> help, history)"
+send "\025"
+expect "cli> "
+
+# ---- Test 4: History Up/Down ----
+# History so far: help, version, echo hello world, foobar, help
+# Clear and type known commands for predictable history
+send "aaa\r"
+expect "cli> "
+send "bbb\r"
+expect "cli> "
+send "ccc\r"
+expect "cli> "
+
+# Up once -> ccc
+send "\033\[A"
+expect "ccc"
+puts "\[PASS\] history up 1 (ccc)"
+
+# Up again -> bbb
+send "\033\[A"
+expect "bbb"
+puts "\[PASS\] history up 2 (bbb)"
+
+# Up again -> aaa
+send "\033\[A"
+expect "aaa"
+puts "\[PASS\] history up 3 (aaa)"
+
+# Down -> bbb
+send "\033\[B"
+expect "bbb"
+puts "\[PASS\] history down 1 (bbb)"
+
+# Down -> ccc
+send "\033\[B"
+expect "ccc"
+puts "\[PASS\] history down 2 (ccc)"
+
+# Down -> empty (current line)
+send "\033\[B"
+sleep 0.2
+
+# ---- Test 5: Ctrl-U clear line ----
+send "something"
+send "\025"
+sleep 0.1
+send "quit\r"
+expect "Bye."
+puts "\[PASS\] ctrl-u and quit"
+
+puts "\n>>> ALL TESTS PASSED <<<"

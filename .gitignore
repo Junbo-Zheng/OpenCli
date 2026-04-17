@@ -1,0 +1,8 @@
+build/
+.cache/
+.mypy_cache/
+.config
+.config.old
+compile_commands.json
+*.o
+*.a
