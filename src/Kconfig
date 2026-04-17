@@ -93,6 +93,50 @@ endchoice
 
 endmenu
 
+menu "CLI Networking"
+
+config CLI_NET_ENABLE
+    bool "Enable client/server mode"
+    default n
+    help
+      Enable remote CLI access via transport layer (Unix socket or POSIX mq).
+      Server embeds into the main process; clients connect remotely.
+
+if CLI_NET_ENABLE
+
+choice CLI_NET_TRANSPORT
+    prompt "Transport layer"
+    default CLI_NET_TRANSPORT_UNIX
+
+config CLI_NET_TRANSPORT_UNIX
+    bool "Unix domain socket"
+
+config CLI_NET_TRANSPORT_MQ
+    bool "POSIX message queue"
+
+endchoice
+
+config CLI_NET_SERVER
+    bool "Build server library"
+    default y
+
+config CLI_NET_CLIENT
+    bool "Build client application"
+    default y
+
+config CLI_NET_MAX_CLIENTS
+    int "Maximum concurrent clients"
+    default 4
+    range 1 16
+
+config CLI_NET_SOCKET_PATH
+    string "Socket/endpoint path"
+    default "/tmp/cli.sock"
+
+endif # CLI_NET_ENABLE
+
+endmenu
+
 menu "Debug"
 
 config CLI_ASAN

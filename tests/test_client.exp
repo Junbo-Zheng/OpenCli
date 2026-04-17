@@ -1,0 +1,98 @@
+#!/usr/bin/expect -f
+# Copyright 2026 Junbo Zheng
+# SPDX-License-Identifier: Apache-2.0
+#
+# Automated test for mini-cli client/server mode.
+# Usage: expect tests/test_client.exp [path_to_cli_client]
+# Requires: cli_server already running in background.
+
+set timeout 5
+
+if {$argc > 0} {
+    set cli_bin [lindex $argv 0]
+} else {
+    set cli_bin "build/examples/cli_client"
+}
+
+spawn $cli_bin
+expect "Connected"
+expect "cli>"
+
+# ---- Test 1: Command execution ----
+send "version\r"
+expect "mini-cli"
+puts "\n\[PASS\] CMD: version"
+
+expect "cli>"
+send "echo hello from client\r"
+expect "hello from client"
+puts "\[PASS\] CMD: echo"
+
+expect "cli>"
+send "foobar\r"
+expect "Unknown command"
+puts "\[PASS\] CMD: unknown command"
+
+# ---- Test 2: Tab completion (single match) ----
+expect "cli>"
+send "hel\t"
+expect "help "
+send "\r"
+expect "Available commands"
+puts "\[PASS\] TAB: single match (hel -> help)"
+
+# ---- Test 3: Tab completion (sub-command candidates) ----
+expect "cli>"
+send "start \t"
+expect {
+    "timer" { puts "\[PASS\] TAB: sub-command candidates (start)" }
+    timeout { puts "\[FAIL\] TAB: no candidates for start"; exit 1 }
+}
+
+# Clear and submit to get back to clean prompt
+send "\025"
+sleep 0.1
+send "\r"
+expect "cli>"
+
+# ---- Test 4: Sub-command execution ----
+send "start timer\r"
+expect {
+    "Timer started" { puts "\[PASS\] CMD: start timer (2-level)" }
+    timeout { puts "\[FAIL\] CMD: start timer timeout"; exit 1 }
+}
+
+expect "cli>"
+send "net if status\r"
+expect "eth0"
+puts "\[PASS\] CMD: net if status (3-level)"
+
+# ---- Test 5: History ----
+expect "cli>"
+send "aaa\r"
+expect "cli>"
+send "bbb\r"
+expect "cli>"
+
+# Up -> bbb
+send "\033\[A"
+expect "bbb"
+puts "\[PASS\] History: up 1"
+
+# Up -> aaa
+send "\033\[A"
+expect "aaa"
+puts "\[PASS\] History: up 2"
+
+# Down -> bbb
+send "\033\[B"
+expect "bbb"
+puts "\[PASS\] History: down"
+
+# Clear and quit
+send "\025"
+sleep 0.2
+send "quit\r"
+expect eof
+
+puts "\n>>> ALL CLIENT/SERVER TESTS PASSED <<<"
