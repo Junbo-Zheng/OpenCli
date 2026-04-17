@@ -10,7 +10,7 @@ on:
     branches: [master]
 
 jobs:
-  build-and-test:
+  standalone:
     strategy:
       matrix:
         include:
@@ -47,3 +47,41 @@ jobs:
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
+
+  client-server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y expect ninja-build
+          pip3 install kconfiglib
+
+      - name: Enable networking config
+        run: |
+          python3 -c "
+          import kconfiglib, os
+          os.environ['srctree'] = '.'
+          kconf = kconfiglib.Kconfig('Kconfig', suppress_traceback=True)
+          kconf.load_config('defconfig')
+          kconf.syms['CLI_NET_ENABLE'].set_value(2)
+          kconf.syms['CLI_NET_SERVER'].set_value(2)
+          kconf.syms['CLI_NET_CLIENT'].set_value(2)
+          kconf.write_config('.config')
+          "
+
+      - name: Configure and build
+        run: |
+          cmake -B build -G Ninja
+          cmake --build build -j$(nproc)
+
+      - name: Test client/server
+        run: |
+          ./build/examples/cli_server &
+          SERVER_PID=$!
+          sleep 1
+          expect tests/test_client.exp ./build/examples/cli_client
+          kill $SERVER_PID 2>/dev/null || true
+          wait $SERVER_PID 2>/dev/null || true

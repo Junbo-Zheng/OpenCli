@@ -22,6 +22,10 @@
 #include "cli.h"
 #include "cli_port.h"
 
+#ifdef CONFIG_CLI_NET_SERVER
+#include "cli_server.h"
+#endif
+
 #include <stdio.h>
 #include <string.h>
 
@@ -390,7 +394,40 @@ int main(void)
                   " — Tab to complete, Up/Down for history, "
                   "Ctrl-D to exit\r\n");
 
+#ifdef CONFIG_CLI_NET_SERVER
+    {
+        cli_server_t server;
+
+        /*
+         * Register SIGTERM/SIGINT handler for graceful shutdown.
+         *
+         * Without this, killing the server (e.g. kill $PID or Ctrl-C)
+         * delivers a fatal signal while the process is blocked in poll().
+         * ASan intercepts the signal before the default handler runs and
+         * prints "AddressSanitizer:DEADLYSIGNAL" in a loop because it
+         * cannot unwind the stack cleanly from inside a syscall.
+         *
+         * By catching the signal ourselves, we set server.running = 0,
+         * poll() returns on the next iteration, cli_server_run() exits
+         * normally, and the process terminates via return 0 — giving
+         * ASan a clean exit path for its leak checks.
+         */
+        cli_server_install_signal_handler(&server);
+
+        cli_port_puts("Starting server on " CONFIG_CLI_NET_SOCKET_PATH
+                      " ...\r\n");
+
+        if (cli_server_init(&server, &cli, NULL) < 0) {
+            cli_port_puts("Error: cannot start server\r\n");
+            return 1;
+        }
+
+        cli_server_run(&server);
+        cli_server_deinit(&server);
+    }
+#else
     cli_run(&cli);
+#endif
 
     cli_port_puts("Bye.\r\n");
     return 0;

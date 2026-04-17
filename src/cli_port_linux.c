@@ -31,6 +31,14 @@
 static struct termios orig_termios;
 static bool raw_active = false;
 
+/* Output hook for server-side output capture */
+static void (*s_output_hook)(const char *);
+
+void cli_server_set_output_hook(void (*fn)(const char *))
+{
+    s_output_hook = fn;
+}
+
 int cli_port_getchar(void)
 {
     return getchar();
@@ -38,11 +46,22 @@ int cli_port_getchar(void)
 
 void cli_port_putchar(char c)
 {
+    if (s_output_hook) {
+        char buf[2] = {c, '\0'};
+        s_output_hook(buf);
+        return;
+    }
+
     putchar(c);
 }
 
 void cli_port_puts(const char *s)
 {
+    if (s_output_hook) {
+        s_output_hook(s);
+        return;
+    }
+
     fputs(s, stdout);
 }
 

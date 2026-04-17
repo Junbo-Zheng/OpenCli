@@ -63,6 +63,9 @@ foreach(_line ${_config_lines})
     endif()
 endforeach()
 
+# Re-run cmake configure when .config changes (e.g. after menuconfig)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS "${DOT_CONFIG}")
+
 # Platform selection
 if(CONFIG_CLI_PLATFORM_RTOS)
     set(CLI_PORT_SRC_FILE cli_port_rtos.c)

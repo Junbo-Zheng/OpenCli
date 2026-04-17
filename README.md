@@ -2,7 +2,11 @@
 
 Portable CLI framework with sub-command tree, tab completion, and command history. Pure C, zero dynamic allocation, zero external dependencies — designed for RTOS porting.
 
+Supports **client/server mode**: server embeds into the main process, remote clients connect with full tab completion and history.
+
 ## Architecture
+
+### Standalone Mode (default)
 
 ```
 ┌──────────────────────────────────────────────┐
@@ -17,6 +21,23 @@ Portable CLI framework with sub-command tree, tab completion, and command histor
 └───────────────────┴──────────────────────────┘
 ```
 
+### Client/Server Mode (`CONFIG_CLI_NET_ENABLE=y`)
+
+```
+┌─────────────────────────────┐     ┌──────────────────────────────┐
+│ cli_client (remote process) │     │ cli_server (main process)    │
+│  Local line editing         │     │  cli_t (commands registered) │
+│  Local history              │     │  poll() multi-client loop    │
+│  Tab → TAB request ─────────┼────►│  Execute CMD / resolve TAB   │
+│  Enter → CMD request ───────┼────►│  Return RSP / COMP ──────────┼──►
+│  Display response ◄─────────┼─────┤  Output capture hook         │
+├─────────────────────────────┤     ├──────────────────────────────┤
+│     cli_transport.h         │     │     cli_transport.h          │
+├──────────┬──────────────────┤     ├──────────┬───────────────────┤
+│ unix.c   │  mq.c (RTOS)    │     │ unix.c   │  mq.c (RTOS)     │
+└──────────┴──────────────────┘     └──────────┴───────────────────┘
+```
+
 ## Features
 
 - **Sub-command tree** — multi-level commands (`net if up`, `sys config wifi ssid`), unlimited depth
@@ -24,20 +45,40 @@ Portable CLI framework with sub-command tree, tab completion, and command histor
 - **Command history** — Up/Down arrow, configurable depth, duplicate suppression
 - **Line editing** — Left/Right cursor, Backspace, Delete, Home/End
 - **Shortcuts** — Ctrl-A/E/K/U/L/D, configurable Ctrl-C (quit/clear-line/ignore)
+- **Client/server** — remote CLI access with full tab completion and history over Unix socket or POSIX mq
+- **Multi-client** — server supports up to N concurrent clients (configurable)
 - **Pure C11** — no C++, no STL, no malloc, no external libraries
 - **Port layer** — implement 6 functions to run on any platform
+- **Transport port** — implement 1 file to add new IPC mechanisms
 - **Kconfig** — menuconfig for build-time configuration (NuttX style)
+- **Auto-reconfigure** — `.config` changes auto-trigger CMake reconfigure on next build
 - **CI** — GitHub Actions with gcc/clang on Linux + clang on macOS
 
 ## Quick Start
 
+### Standalone Mode
+
 ```bash
-# Build (default: Linux, all commands enabled)
 cmake -B build -G Ninja
 cmake --build build -j
-
-# Run
 ./build/examples/cli
+```
+
+### Client/Server Mode
+
+```bash
+# Enable networking via menuconfig
+cmake --build build -t menuconfig
+# → CLI Networking → Enable client/server mode → y
+
+# Build
+cmake --build build -j
+
+# Terminal 1: start server
+./build/examples/cli_server
+
+# Terminal 2: connect client
+./build/examples/cli_client
 ```
 
 ## Configuration
@@ -46,8 +87,7 @@ cmake --build build -j
 # Interactive menuconfig
 cmake --build build -t menuconfig
 
-# Regenerate header after config change
-cmake --build build -t genconfig
+# Build (auto-reconfigures if .config changed)
 cmake --build build -j
 
 # Save minimal sorted defconfig (NuttX style)
@@ -66,9 +106,19 @@ cmake --build build -t savedefconfig
 | `CONFIG_CLI_MAX_HISTORY` | int | 16 | History buffer depth |
 | `CONFIG_CLI_MAX_COMMANDS` | int | 32 | Max registered commands |
 | `CONFIG_CLI_MAX_SUB_COMMANDS` | int | 16 | Max sub-commands per command |
-| `CONFIG_CLI_CTRL_C_QUIT` | choice | y | Ctrl-C quits CLI |
-| `CONFIG_CLI_CTRL_C_CLEAR_LINE` | choice | n | Ctrl-C clears current line |
-| `CONFIG_CLI_CTRL_C_IGNORE` | choice | n | Ctrl-C ignored |
+| `CONFIG_CLI_CTRL_C_*` | choice | Quit | Ctrl-C behavior |
+
+**CLI Networking:**
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `CONFIG_CLI_NET_ENABLE` | bool | n | Enable client/server mode |
+| `CONFIG_CLI_NET_TRANSPORT_UNIX` | choice | y | Unix domain socket transport |
+| `CONFIG_CLI_NET_TRANSPORT_MQ` | choice | n | POSIX message queue transport |
+| `CONFIG_CLI_NET_SERVER` | bool | y | Build server library |
+| `CONFIG_CLI_NET_CLIENT` | bool | y | Build client application |
+| `CONFIG_CLI_NET_MAX_CLIENTS` | int | 4 | Max concurrent clients |
+| `CONFIG_CLI_NET_SOCKET_PATH` | string | `/tmp/cli.sock` | Socket/endpoint path |
 
 **Built-in Commands** (each independently toggleable):
 
@@ -89,81 +139,94 @@ cmake --build build -t savedefconfig
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `CONFIG_CLI_ASAN` | bool | y (Linux) | AddressSanitizer — detect memory errors |
-| `CONFIG_CLI_UBSAN` | bool | y (Linux) | UndefinedBehaviorSanitizer — detect UB |
+| `CONFIG_CLI_ASAN` | bool | y (Linux) | AddressSanitizer |
+| `CONFIG_CLI_UBSAN` | bool | y (Linux) | UndefinedBehaviorSanitizer |
 
-**Build:**
+> Note: Sanitizers are automatically disabled on macOS regardless of Kconfig
+> settings. macOS clang's ASan/UBSan have compatibility issues with termios
+> raw mode and `popen()`, causing illegal hardware instruction crashes.
 
-| Option | Default | Description |
-|--------|---------|-------------|
-| `CONFIG_CLI_BUILD_EXAMPLES` | y | Build example application (set n for library only) |
+## Wire Protocol
+
+Client/server communication uses a binary frame protocol:
+
+```
+[1 byte type][2 bytes payload length (big-endian)][payload]
+
+Types:
+  0x01 CMD  — Client → Server: execute command line
+  0x02 TAB  — Client → Server: request tab completion
+  0x03 RSP  — Server → Client: command output text
+  0x04 COMP — Server → Client: tab candidates (\t separated)
+```
 
 ## API
 
-Single unified registration API:
+### Standalone
 
 ```c
-/* Initialize */
 cli_t cli;
 cli_init(&cli, "mydev> ");
-
-/* Top-level command (parent = NULL) */
 cli_register(&cli, NULL, "reboot", "Reboot system", cmd_reboot);
-
-/* Sub-command tree (parent = node pointer) */
-cli_cmd_t *net = cli_register(&cli, NULL, "net", "Network", NULL);
-cli_cmd_t *net_if = cli_register(&cli, net, "if", "Interface", NULL);
-cli_register(&cli, net_if, "up", "Bring up", cmd_net_if_up);
-cli_register(&cli, net_if, "down", "Bring down", cmd_net_if_down);
-
-/* Quit command */
-cli_register(&cli, NULL, "quit", "Quit", my_quit_handler);
-
-/* In quit handler: */
-void my_quit_handler(int argc, char *argv[]) {
-    cli_quit(&cli);
-}
-
-/* Run (blocks until quit or Ctrl-D) */
 cli_run(&cli);
+```
+
+### Server (embed in main process)
+
+```c
+cli_t cli;
+cli_server_t server;
+
+cli_init(&cli, CONFIG_CLI_PROMPT);
+cli_register(&cli, NULL, "reboot", "Reboot", cmd_reboot);
+
+cli_server_install_signal_handler(&server);  /* graceful SIGTERM/SIGINT */
+cli_server_init(&server, &cli, NULL);        /* NULL = default socket path */
+cli_server_run(&server);                     /* blocking poll loop */
+cli_server_deinit(&server);
+```
+
+> `cli_server_install_signal_handler()` catches SIGTERM/SIGINT and sets
+> `server.running = 0` so the poll loop exits cleanly. Without it, killing
+> the server while blocked in `poll()` causes ASan to report
+> `DEADLYSIGNAL` — ASan intercepts the fatal signal but cannot unwind the
+> stack from inside a syscall, resulting in an infinite error loop.
+
+### Client (separate process)
+
+```c
+cli_client_t client;
+cli_client_init(&client, NULL, "mydev> ");  /* NULL = default socket path */
+cli_client_run(&client);                     /* blocking interactive loop */
+cli_client_deinit(&client);
 ```
 
 ## Testing
 
-Tests use [expect](https://core.tcl-lang.org/expect) to simulate interactive terminal input (Tab, arrow keys), which cannot be tested via pipe or shell scripts.
-
-Prerequisites:
+Tests use [expect](https://core.tcl-lang.org/expect) to simulate interactive terminal input.
 
 ```bash
-sudo apt install expect    # Linux
-brew install expect        # macOS
-```
-
-Run tests:
-
-```bash
-# Method 1: via CTest (recommended)
-# Manages test results, timeout, and output. Also used in CI.
+# Standalone mode tests (via CTest)
 ctest --test-dir build --output-on-failure
 
-# Method 2: run expect script directly
-# Useful for debugging — shows the full interactive process.
-expect tests/test_cli.exp build/examples/cli
+# Client/server mode tests (manual)
+./build/examples/cli_server &
+expect tests/test_client.exp ./build/examples/cli_client
+kill %1
 ```
 
-Test coverage: command execution, tab completion (single/multiple match), history (Up/Down), line editing (Ctrl-U), quit/exit.
-
-> Note: Testing is only enabled for Linux/macOS platform (`CONFIG_CLI_PLATFORM_LINUX`). RTOS builds skip tests since the firmware cannot run directly on the host.
+> Testing is only enabled for standalone Linux builds. Server mode and RTOS builds skip CTest.
 
 ## CI
 
 GitHub Actions runs on every push/PR to master:
 
-| OS | Compiler | Status |
-|----|----------|--------|
-| Ubuntu | gcc | Build + Test |
-| Ubuntu | clang | Build + Test |
-| macOS | clang | Build + Test |
+| OS | Compiler | Mode | Tests |
+|----|----------|------|-------|
+| Ubuntu | gcc | standalone | ✅ |
+| Ubuntu | clang | standalone | ✅ |
+| macOS | clang | standalone | ✅ |
+| Ubuntu | gcc | client/server | ✅ |
 
 All builds use `-Wall -Wextra -Werror`.
 
@@ -172,47 +235,48 @@ All builds use `-Wall -Wextra -Werror`.
 Implement 6 functions in `cli_port.h`:
 
 ```c
-int  cli_port_getchar(void);       /* blocking read 1 byte */
-void cli_port_putchar(char c);     /* write 1 byte */
-void cli_port_puts(const char *s); /* write string */
-void cli_port_flush(void);         /* flush output (can be no-op) */
-void cli_port_raw_mode(void);      /* enter raw mode (can be no-op) */
-void cli_port_restore_mode(void);  /* restore mode (can be no-op) */
+int  cli_port_getchar(void);
+void cli_port_putchar(char c);
+void cli_port_puts(const char *s);
+void cli_port_flush(void);
+void cli_port_raw_mode(void);
+void cli_port_restore_mode(void);
 ```
 
-Select RTOS platform via menuconfig or `.config`:
-
-```
-CONFIG_CLI_PLATFORM_RTOS=y
-```
+For client/server on RTOS, implement `cli_transport_mq.c` (POSIX mq) or your own transport.
 
 ## Project Structure
 
 ```
-├── CMakeLists.txt              # Top-level build
+├── CMakeLists.txt
 ├── cmake/
-│   └── kconfig.cmake           # Kconfig integration
-├── Kconfig                     # Top-level config (sources src/ and examples/)
-├── defconfig                   # Default configuration (minimal, sorted)
-├── genconfig.py                # Generate cli_config.h / savedefconfig
+│   └── kconfig.cmake               # Kconfig integration + auto-reconfigure
+├── Kconfig
+├── defconfig
+├── genconfig.py
 ├── src/
-│   ├── CMakeLists.txt          # Builds libcli.a static library
-│   ├── Kconfig                 # Core params, commands, platform config
-│   ├── cli.h                   # Core API
-│   ├── cli.c                   # Core implementation
-│   ├── cli_port.h              # Port layer interface
-│   ├── cli_port_linux.c        # Linux/macOS reference port
-│   └── cli_port_rtos.c         # RTOS port template
+│   ├── CMakeLists.txt               # Builds libcli.a
+│   ├── Kconfig                      # Core, networking, platform, debug config
+│   ├── cli.h / cli.c               # Core: line editing, completion, history
+│   ├── cli_port.h                   # Port layer interface
+│   ├── cli_port_linux.c             # Linux/macOS port (+ output hook)
+│   ├── cli_port_rtos.c             # RTOS port template
+│   ├── cli_protocol.h              # Wire protocol (CMD/TAB/RSP/COMP)
+│   ├── cli_transport.h             # Transport port interface
+│   ├── cli_transport_unix.c        # Unix domain socket transport
+│   ├── cli_transport_mq.c          # POSIX mq transport template
+│   ├── cli_server.h / cli_server.c # Server: multi-client poll loop
+│   └── cli_client.h / cli_client.c # Client: local editing + remote exec
 ├── examples/
-│   ├── CMakeLists.txt          # Builds demo application
-│   ├── Kconfig                 # CLI_BUILD_EXAMPLES + example command toggles
-│   └── main.c                  # Demo: sub-commands, system commands
+│   ├── CMakeLists.txt
+│   ├── Kconfig
+│   ├── main.c                       # Server or standalone demo
+│   └── client_main.c               # Client demo
 ├── tests/
-│   └── test_cli.exp            # Automated expect test
-├── .github/
-│   └── workflows/
-│       └── ci.yml              # GitHub Actions CI (gcc/clang, Linux/macOS)
-└── LICENSE                     # Apache 2.0
+│   ├── test_cli.exp                 # Standalone interactive test
+│   └── test_client.exp              # Client/server test
+├── .github/workflows/ci.yml
+└── LICENSE                          # Apache 2.0
 ```
 
 ## License
