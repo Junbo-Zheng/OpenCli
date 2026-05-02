@@ -1,4 +1,4 @@
-# mini-cli
+# OpenCli
 
 Portable CLI framework with sub-command tree, tab completion, and command history. Pure C, zero dynamic allocation, zero external dependencies — designed for RTOS porting.
 

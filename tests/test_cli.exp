@@ -2,7 +2,7 @@
 # Copyright 2026 Junbo Zheng
 # SPDX-License-Identifier: Apache-2.0
 #
-# Automated test for mini-cli: tab completion, history, and basic commands.
+# Automated test for OpenCli: tab completion, history, and basic commands.
 # Usage: expect tests/test_cli.exp [path_to_cli_binary]
 # Requires: expect (apt install expect)
 

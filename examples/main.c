@@ -87,7 +87,7 @@ static void cmd_version(int argc, char *argv[])
 {
     (void)argc;
     (void)argv;
-    cli_port_puts("mini-cli v" CONFIG_CLI_VERSION "\r\n");
+    cli_port_puts("OpenCli v" CONFIG_CLI_VERSION "\r\n");
 }
 #endif
 
@@ -390,7 +390,7 @@ int main(void)
     cli_register(&cli, NULL, "free", "Show memory usage", cmd_free);
 #endif
 
-    cli_port_puts("mini-cli v" CONFIG_CLI_VERSION
+    cli_port_puts("OpenCli v" CONFIG_CLI_VERSION
                   " — Tab to complete, Up/Down for history, "
                   "Ctrl-D to exit\r\n");
 

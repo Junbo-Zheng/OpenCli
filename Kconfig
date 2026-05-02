@@ -6,7 +6,7 @@
 # Use 'cmake --build build -t menuconfig' to modify.
 #
 
-mainmenu "mini-cli Configuration"
+mainmenu "OpenCli Configuration"
 
 source "src/Kconfig"
 source "examples/Kconfig"

@@ -2,7 +2,7 @@
 # Copyright 2026 Junbo Zheng
 # SPDX-License-Identifier: Apache-2.0
 #
-# Automated test for mini-cli client/server mode.
+# Automated test for OpenCli client/server mode.
 # Usage: expect tests/test_client.exp [path_to_cli_client]
 # Requires: cli_server already running in background.
 
@@ -20,7 +20,7 @@ expect "cli>"
 
 # ---- Test 1: Command execution ----
 send "version\r"
-expect "mini-cli"
+expect "OpenCli"
 puts "\n\[PASS\] CMD: version"
 
 expect "cli>"

@@ -47,7 +47,7 @@ def savedefconfig(kconf, output):
 
     with open(output, "w") as f:
         f.write("#\n")
-        f.write("# Default configuration for mini-cli.\n")
+        f.write("# Default configuration for OpenCli.\n")
         f.write("# Use 'cmake --build build -t savedefconfig' to regenerate.\n")
         f.write("#\n")
         f.writelines(configs)
