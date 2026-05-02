@@ -1,0 +1,20 @@
+# Copyright 2026 Junbo Zheng
+# SPDX-License-Identifier: Apache-2.0
+#
+# Dependabot config: keep GitHub Actions pinned versions up to date.
+# https://docs.github.com/en/code-security/dependabot/dependabot-version-updates
+
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    labels:
+      - dependencies
+      - ci
+    commit-message:
+      prefix: ci
+      include: scope

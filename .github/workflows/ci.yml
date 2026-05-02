@@ -9,9 +9,17 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   standalone:
     strategy:
+      fail-fast: false
       matrix:
         include:
           - os: ubuntu-latest
@@ -21,6 +29,7 @@ jobs:
           - os: macos-latest
             compiler: clang
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -43,13 +52,14 @@ jobs:
           CC: ${{ matrix.compiler }}
 
       - name: Build
-        run: cmake --build build -j$(nproc 2>/dev/null || sysctl -n hw.ncpu)
+        run: cmake --build build -j"$(nproc 2>/dev/null || sysctl -n hw.ncpu)"
 
       - name: Test
         run: ctest --test-dir build --output-on-failure
 
   client-server:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
 
@@ -75,7 +85,7 @@ jobs:
       - name: Configure and build
         run: |
           cmake -B build -G Ninja
-          cmake --build build -j$(nproc)
+          cmake --build build -j"$(nproc)"
 
       - name: Test client/server
         run: |

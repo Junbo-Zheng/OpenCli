@@ -76,7 +76,9 @@ def main():
         output = sys.argv[2] if len(sys.argv) > 2 else defconfig
         savedefconfig(kconf, output)
     else:
-        output = sys.argv[2] if len(sys.argv) > 2 else os.path.join(src_dir, "cli_config.h")
+        output = (
+            sys.argv[2] if len(sys.argv) > 2 else os.path.join(src_dir, "cli_config.h")
+        )
         genconfig(kconf, output)
 
 
