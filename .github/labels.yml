@@ -3,22 +3,26 @@
 #
 # GitHub issue labels.
 
----
-name: dependencies
-description: Pull requests that update dependencies
-color: "edevex"
-name: ci
-description: Pull requests that update CI/CD configuration
-color: "0075c"
-name: size/s
-description: Small PR - under 10 files, under 100 lines
-color: "1ddd22"
-name: size/m
-description: Medium PR - under 25 files, under 400 lines
-color: "fbca04"
-name: size/l
-description: Large PR - 25+ files or 400+ lines
-color: "eb6420"
-name: size/xl
-description: Extra Large PR - 100+ files or 1000+ lines
-color: "ee3"
+- name: dependencies
+  description: Pull requests that update dependencies
+  color: "0366d6"
+
+- name: ci
+  description: Pull requests that update CI/CD configuration
+  color: "0075ca"
+
+- name: size/s
+  description: Small PR - under 10 files, under 100 lines
+  color: "1ddd22"
+
+- name: size/m
+  description: Medium PR - under 25 files, under 400 lines
+  color: "fbca04"
+
+- name: size/l
+  description: Large PR - 25+ files or 400+ lines
+  color: "eb6420"
+
+- name: size/xl
+  description: Extra Large PR - 100+ files or 1000+ lines
+  color: "b60205"
