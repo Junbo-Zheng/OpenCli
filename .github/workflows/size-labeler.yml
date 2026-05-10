@@ -52,23 +52,24 @@ jobs:
             });
             const existingLabels = prInfo.labels.map(l => l.name);
 
-            // Remove other size labels, keep only appropriate one
+            // Remove other size labels by replacing with just the new one
             const sizeLabels = ['size/s', 'size/m', 'size/l', 'size/xl'];
-            for (const label of sizeLabels) {
-              if (existingLabels.includes(label)) {
-                await github.rest.issues.removeLabels({
-                  owner: context.repo.owner,
-                  repo: context.repo.repo,
-                  issue_number: pr,
-                  name: label
-                });
-              }
+            const labelsToRemove = existingLabels.filter(l => sizeLabels.includes(l));
+            if (labelsToRemove.length > 0) {
+              await github.rest.issues.deleteLabel({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr,
+                name: labelsToRemove[0]
+              });
             }
 
-            // Add new size label
-            await github.rest.issues.addLabels({
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              issue_number: pr,
-              labels: [sizeLabel]
-            });
+            // Add new size label (addLabels replaces automatically for same label; for others, previous was removed above)
+            if (!existingLabels.includes(sizeLabel)) {
+              await github.rest.issues.addLabels({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: pr,
+                labels: [sizeLabel]
+              });
+            }
